@@ -20,6 +20,7 @@ type ProductDetail struct {
 	Liked        bool   `json:"liked"`
 	CreateTime   int64  `json:"create_time"`
 	Hash         string `json:"hash"`
+	CanBuy       bool   `json:"can_buy"`
 }
 
 type ProductList struct {

@@ -22,6 +22,7 @@ type Product struct {
 	UpdateTime  int64              `json:"-" column:"update_time"`
 	DelTime     int64              `json:"-" column:"del_time"`
 	SaleTime    int64              `json:"sale_time" column:"sale_time"`
+	AdvanceHour int                `json:"advance_hour" column:"advance_hour"`
 }
 
 func (p Product) TableName() string {

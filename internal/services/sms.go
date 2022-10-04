@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"fmt"
-	"lihood/g"
 	"math/rand"
 	"time"
+
+	"lihood/g"
+	"lihood/utils"
 )
 
 type SmsService interface {
@@ -38,7 +40,6 @@ func (s smsService) SendWithDrawMessage(phone string) error {
 	ctx := context.Background()
 	// 生成4为验证码
 	code := fmt.Sprintf("%04d", rand.Intn(9999))
-	code = "1234"
 	// 存入redis
 	if _, err := g.Redis.Set(ctx, fmt.Sprintf("withdraw:%s", phone), code, time.Minute*10).Result(); err != nil {
 		return err
@@ -48,5 +49,6 @@ func (s smsService) SendWithDrawMessage(phone string) error {
 }
 
 func (s smsService) Send(phone string, code string) error {
-	return nil
+	_, err := utils.SendMsCode(code, phone)
+	return err
 }

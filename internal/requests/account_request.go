@@ -12,8 +12,8 @@ type UpdatePhoneCodeRequest struct {
 type AuthenticationRequest struct {
 	Name          string `json:"name" validate:"required(m=用户名不能为空)"`
 	IDCard        string `json:"id_card" validate:"required(m=身份证号不能为空)"`
-	PositiveImage string `json:"positive_image" validate:"required(m=身份证正面照不能为空);url(m=请上传正确的身份证正面照)"`
-	NegativeImage string `json:"negative_image" validate:"required(m=身份证反面照不能为空);url(m=请上传正确的身份证反面照)"`
+	PositiveImage string `json:"positive_image"`
+	NegativeImage string `json:"negative_image"`
 }
 
 type UpdateAccountInfoRequest struct {

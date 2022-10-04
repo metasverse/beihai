@@ -3,15 +3,18 @@ package account
 import (
 	"bytes"
 	"encoding/base64"
+
 	"github.com/eatmoreapple/regia"
 	"github.com/google/uuid"
 	"github.com/skip2/go-qrcode"
+
 	"lihood/g"
 	"lihood/internal/enum"
 	"lihood/internal/repository"
 	"lihood/internal/requests"
 	"lihood/internal/services"
 	"lihood/pkg/storage"
+	"lihood/utils"
 )
 
 func newSmsLoginController() *smsLoginController {
@@ -129,6 +132,17 @@ func (a accountController) authentication() regia.HandleFunc {
 			return g.BadRequest(context, err.Error())
 		}
 		uid := g.CurrentUserID(context)
+
+		user, err := repository.NewAccountRepository(g.DB).GetByID(uid)
+		if err != nil {
+			return err
+		}
+		// 校验身份证号码
+		_, err = utils.CheckIdCard(req.IDCard, req.Name, user.Phone)
+		if err != nil {
+			return g.Error(err.Error())
+		}
+
 		if err := services.NewAccountService(g.DB).Authentication(
 			uid, req.Name, req.IDCard, req.PositiveImage, req.NegativeImage); err != nil {
 			return err

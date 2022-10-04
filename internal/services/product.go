@@ -4,8 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/eatmoreapple/sqlbuilder"
 	"github.com/google/uuid"
+
 	"lihood/conf"
 	"lihood/g"
 	"lihood/internal/entity"
@@ -15,10 +22,6 @@ import (
 	"lihood/pkg/chain"
 	"lihood/pkg/pay"
 	"lihood/utils"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type ProductService interface {
@@ -355,6 +358,23 @@ func (p productService) ProductDetail(id int64, uid int64) (g.ResponseWriter, er
 	result.AuthorDesc = owner.Description
 	result.OwnerAvatar = owner.Avatar
 	result.TokenID = "#" + utils.ZeroFill(history.Times, len(strconv.FormatInt(product.Stock, 10)))
+
+	// 查询这个作品是否可以购买
+	now := time.Now().Unix()
+
+	if now > product.SaleTime {
+		result.CanBuy = true
+	} else {
+		// 查询当前用户是否在白名单中
+		ok, err := repository.NewWhiteListRepository(p.session).IsWhiteList(id, uid)
+		if err != nil {
+			log.Println(err)
+		}
+		if ok {
+			result.CanBuy = now+int64(product.AdvanceHour*3600) > product.SaleTime
+		}
+	}
+
 	return g.NewRespWriter(result), nil
 }
 

@@ -5,16 +5,18 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/go-redis/redis/v9"
 	"github.com/google/uuid"
+
 	"lihood/g"
 	"lihood/internal/models"
 	"lihood/internal/repository"
 	"lihood/pkg/chain"
 	"lihood/pkg/jwt"
 	"lihood/utils"
-	"math/rand"
-	"time"
 )
 
 type PhoneLoginService interface {
@@ -108,7 +110,6 @@ func (l phoneLoginService) Send(phone string) error {
 	} else {
 		code = cmd.Val()
 	}
-	code = "1234"
 	// 存入redis
 	if _, err := g.Redis.Set(ctx, key, code, time.Minute*10).Result(); err != nil {
 		return err
