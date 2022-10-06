@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -13,14 +13,12 @@ import (
 	"github.com/eatmoreapple/sqlbuilder"
 	"github.com/google/uuid"
 
-	"lihood/conf"
 	"lihood/g"
 	"lihood/internal/entity"
 	"lihood/internal/enum"
 	"lihood/internal/models"
 	"lihood/internal/repository"
 	"lihood/pkg/chain"
-	"lihood/pkg/pay"
 	"lihood/utils"
 )
 
@@ -359,12 +357,22 @@ func (p productService) ProductDetail(id int64, uid int64) (g.ResponseWriter, er
 	result.OwnerAvatar = owner.Avatar
 	result.TokenID = "#" + utils.ZeroFill(history.Times, len(strconv.FormatInt(product.Stock, 10)))
 
+	result.Sales, err = repository.NewUserProductRepository(p.session).CountByPID(id)
+	if err != nil {
+		return nil, err
+	}
+	result.Sales = result.Sales - 1
+
 	// 查询这个作品是否可以购买
 	now := time.Now().Unix()
 
 	if now > product.SaleTime {
 		result.CanBuy = true
 	} else {
+		// 判断是否到了提前购的时间
+		if now > product.SaleTime-int64(product.AdvanceHour*3600) {
+
+		}
 		// 查询当前用户是否在白名单中
 		ok, err := repository.NewWhiteListRepository(p.session).IsWhiteList(id, uid)
 		if err != nil {
@@ -375,49 +383,28 @@ func (p productService) ProductDetail(id int64, uid int64) (g.ResponseWriter, er
 		}
 	}
 
+	// 查询自己有没有购买过
+	ok, err := repository.NewUserProductRepository(p.session).ExistsByUIDAndPid(uid, history.PID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
+	if ok {
+		result.CanBuy = false
+	}
+
 	return g.NewRespWriter(result), nil
 }
 
 // CreateProduct 创建作品
 func (p productService) CreateProduct(product *models.Product, payType enum.PayType) (g.ResponseWriter, error) {
-	// 创建订单数据
-	var prefix string
-	switch payType {
-	case enum.Alipay:
-		prefix = "103A"
-	case enum.Wechat, enum.CloudPay:
-		prefix = "32FY"
-	}
-
-	orderNo := prefix + uuid.New().String()[:8]
-	// 创建支付订单
-	payClient := pay.PayerFactory(payType)
-	if payClient == nil {
-		return nil, g.Error("支付类型错误")
-	}
-	fmt.Println(orderNo)
-	product.OrderNo = orderNo
-	product.PayType = int(payType)
-
-	cb := conf.Instance.Server.Domain + fmt.Sprintf("/api/v1/product/create/callback/%s", product.OrderNo)
-
-	payResp, err := payClient.Pay(orderNo, product.Price, cb)
-	if err != nil {
-		return nil, err
-	}
-
 	// 保存到数据库
-	if err = repository.NewProductRepository(p.session).Create(product); err != nil {
+	if err := repository.NewProductRepository(p.session).Create(product); err != nil {
 		return nil, err
 	}
 
-	// TODO 项目上线后删除这个
-	go func() {
-		time.Sleep(time.Second)
-		http.Post(cb, "application/json", nil)
-	}()
-
-	return g.NewRespWriter(payResp), nil
+	return nil, nil
 }
 
 //type ProductService interface {

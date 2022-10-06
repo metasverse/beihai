@@ -36,6 +36,8 @@ type ProductList struct {
 	Liked        bool   `json:"liked" column:"is_liked"`
 	IsAirDrop    bool   `json:"is_air_drop" column:"is_air_drop"`
 	Times        int64  `json:"times" column:"times"`
+	Countdown    int64  `json:"countdown" column:"countdown"`
+	SaleTime     int64  `json:"sale_time" column:"sale_time"`
 }
 
 type SalesRank struct {

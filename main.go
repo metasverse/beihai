@@ -1,11 +1,13 @@
 package main
 
 import (
+	"log"
+
 	"github.com/eatmoreapple/regia"
+
 	v1 "lihood/api/v1"
 	"lihood/boot"
 	"lihood/conf"
-	"log"
 )
 
 var engine *regia.Engine
@@ -22,4 +24,5 @@ func init() {
 		context.String("success")
 	}
 	engine.Include("/api/v1", v1.Router())
+	engine.Static("/static/", "./h5")
 }

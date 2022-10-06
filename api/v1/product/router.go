@@ -4,16 +4,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"time"
+
 	"github.com/eatmoreapple/regia"
 	"github.com/google/uuid"
-	"io/ioutil"
+
 	"lihood/g"
 	"lihood/internal/enum"
 	"lihood/internal/models"
 	"lihood/internal/repository"
 	"lihood/pkg/chain"
-	"log"
-	"time"
 )
 
 func NewRouter() *regia.BluePrint {
@@ -42,10 +44,10 @@ func NewRouter() *regia.BluePrint {
 			return
 		}
 
-		author, err := repository.NewAccountRepository(g.DB).GetByID(product.AuthorID)
-		if err != nil {
-			log.Println("查找作者失败")
-		}
+		//author, err := repository.NewAccountRepository(g.DB).GetByID(product.AuthorID)
+		//if err != nil {
+		//	log.Println("查找作者失败")
+		//}
 		tx, err := g.DB.Begin()
 		if err != nil {
 			log.Println("事务开启失败")
@@ -69,23 +71,24 @@ func NewRouter() *regia.BluePrint {
 			Display:    true,
 			CName:      fmt.Sprintf("%s #00%d", product.Cname, 1),
 			SaleTime:   product.SaleTime,
+			Status:     true,
 		}
 
-		client := chain.NewChainClient()
-
-		resp, err := client.NewProduct(history.CID, product.Image, author.BsnAddress, product.Description, g.ChainCallback(history.CID))
-		if err != nil {
-			log.Println("上链失败")
-			tx.Rollback()
-			return
-		}
-		if !resp.Success {
-			log.Println("上链失败", resp.ErrMsg)
-			tx.Rollback()
-			return
-		}
-		history.TxID = resp.Data.TxId
-		history.Hash = resp.Data.Hash
+		//client := chain.NewChainClient()
+		//
+		//resp, err := client.NewProduct(history.CID, product.Image, author.BsnAddress, product.Description, g.ChainCallback(history.CID))
+		//if err != nil {
+		//	log.Println("上链失败")
+		//	tx.Rollback()
+		//	return
+		//}
+		//if !resp.Success {
+		//	log.Println("上链失败", resp.ErrMsg)
+		//	tx.Rollback()
+		//	return
+		//}
+		//history.TxID = resp.Data.TxId
+		//history.Hash = resp.Data.Hash
 
 		if err = repository.NewUserProductRepository(tx).Create(history); err != nil {
 			log.Println("创建失败")

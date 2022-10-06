@@ -3,7 +3,10 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/eatmoreapple/sqlbuilder"
+
 	"lihood/g"
 	"lihood/internal/entity"
 	"lihood/internal/models"
@@ -22,6 +25,7 @@ type UserProductRepository interface {
 	GetByCID(cid string) (*models.UserProduct, error)
 	UpdateStatusByID(id int64, status int) error
 	UpdateHashByID(id int64, hash string) error
+	ExistsByUIDAndPid(uid, pid int64) (bool, error)
 }
 
 func NewUserProductRepository(session g.Session) UserProductRepository {
@@ -30,6 +34,11 @@ func NewUserProductRepository(session g.Session) UserProductRepository {
 
 type userProductRepository struct {
 	session g.Session
+}
+
+func (p userProductRepository) ExistsByUIDAndPid(uid, pid int64) (bool, error) {
+	query := "SELECT 1 FROM tbl_user_product WHERE uid = ? AND pid = ? LIMIT 1"
+	return sqlbuilder.NewQueryScanner[bool](p.session, query, uid, pid).One(context.Background())
 }
 
 func (p userProductRepository) UpdateHashByID(id int64, hash string) error {
@@ -124,6 +133,7 @@ func (p userProductRepository) QueryProductListByIDs(uid int64, ids []int64) ([]
 		sqlbuilder.As(fmt.Sprintf("EXISTS(SELECT 1 FROM tbl_product_likes WHERE pid = a.id AND uid = %d LIMIT 1) ", uid), "is_liked"),
 		sqlbuilder.As("a.times", "times"),
 		sqlbuilder.As("a.is_air_drop", "is_air_drop"),
+		sqlbuilder.As("b.sale_time", "sale_time"),
 	)
 	builder.IN("a.id", sqlbuilder.In[int64](ids)...)
 	builder.GroupBy("a.id")
@@ -134,6 +144,10 @@ func (p userProductRepository) QueryProductListByIDs(uid int64, ids []int64) ([]
 	for _, item := range result {
 		item.Name = fmt.Sprintf("#%d %s", item.Times, item.Name)
 		item.Image = item.Image + "?imageMogr2/thumbnail/!50p"
+		item.Countdown = item.SaleTime - time.Now().Unix()
+		if item.Countdown < 0 {
+			item.Countdown = 0
+		}
 	}
 
 	newResult := make([]*entity.ProductList, len(result))
@@ -153,9 +167,9 @@ func (p userProductRepository) Create(item *models.UserProduct) error {
 	builder := sqlbuilder.NewInserter("?")
 	builder.Table(item.TableName())
 	builder.Fields("pid", "uid", "times", "create_time", "tx_id", "token_id", "hash", "cid", "is_air_drop",
-		"display", "reason", "c_name", "sale_time")
+		"display", "reason", "c_name", "sale_time", "status")
 	builder.Values(item.PID, item.UID, item.Times, item.CreateTime, item.TxID, item.TokenID, item.Hash, item.CID,
-		item.IsAirDrop, item.Display, item.Reason, item.CName, item.SaleTime)
+		item.IsAirDrop, item.Display, item.Reason, item.CName, item.SaleTime, item.Status)
 	result, err := p.session.Exec(builder.String(), builder.Args()...)
 	if err != nil {
 		return err

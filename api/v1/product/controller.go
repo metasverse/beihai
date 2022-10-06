@@ -4,10 +4,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"strings"
+	"time"
+
 	"github.com/eatmoreapple/regia"
 	"github.com/google/uuid"
 	"github.com/mozillazg/go-pinyin"
-	"io/ioutil"
+
+	"lihood/conf"
 	"lihood/g"
 	"lihood/internal/enum"
 	"lihood/internal/models"
@@ -15,9 +21,7 @@ import (
 	"lihood/internal/requests"
 	"lihood/internal/services"
 	"lihood/pkg/chain"
-	"log"
-	"strings"
-	"time"
+	"lihood/pkg/pay"
 )
 
 func newProductController() *productController {
@@ -93,12 +97,29 @@ func (p productController) create() regia.HandleFunc {
 			model.Cname = fmt.Sprintf("%s%d", model.Cname, count)
 		}
 		payType := enum.CloudPay
+
+		// 获取当前用户
+		user, err := repository.NewAccountRepository(g.DB).GetByID(uid)
+		if err != nil {
+			return err
+		}
+
+		if user.IDCardNum == "" {
+			return g.Error("请先实名认证")
+		}
+		model.OrderNo = uuid.New().String()
+		cb := conf.Instance.Server.Domain + fmt.Sprintf("/api/v1/product/create/callback/%s", model.OrderNo)
+		resp, err := pay.HfPay(model.Description, user.IDCardNum, user.Name, "9.99", cb, "1")
+		if err != nil {
+			return g.Error(err.Error())
+		}
+
 		tx, err := g.DB.Begin()
 		if err != nil {
 			return err
 		}
 		service := services.NewProductService(g.DB)
-		resp, err := service.CreateProduct(&model, payType)
+		_, err = service.CreateProduct(&model, payType)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -108,7 +129,8 @@ func (p productController) create() regia.HandleFunc {
 			return err
 		}
 		// 创建订单
-		return g.OK(context, resp)
+		context.SetHeader("Content-Type", "application/json")
+		return context.Write(resp)
 	})
 }
 

@@ -1,14 +1,18 @@
 package order
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/eatmoreapple/regia"
+	"github.com/go-redis/redis/v9"
+
 	"lihood/g"
 	"lihood/internal/enum"
 	"lihood/internal/requests"
 	"lihood/internal/services"
-	"log"
-	"time"
 )
 
 type controller struct{}
@@ -21,11 +25,14 @@ func (controller) commit() regia.HandleFunc {
 			return g.BadRequest(context, err.Error())
 		}
 		uid := g.CurrentUserID(context)
+		//uid := int64(3)
 
 		// 查一下当前的作品有没有锁住
 		count, err := g.Redis.Exists(context.Request.Context(), fmt.Sprintf("lock:order:%d", req.PID)).Result()
 		if err != nil {
-			return err
+			if !errors.Is(err, redis.Nil) {
+				return err
+			}
 		}
 		if count > 0 {
 			// 说明被锁住了，直接返回
@@ -34,8 +41,9 @@ func (controller) commit() regia.HandleFunc {
 		// 获取锁单时间
 		seconds, err := g.Redis.Get(context.Request.Context(), "order_lock_times").Int64()
 		if err != nil {
-			return err
+			seconds = 5
 		}
+
 		tx, err := g.DB.Begin()
 		if err != nil {
 			return err
@@ -52,7 +60,8 @@ func (controller) commit() regia.HandleFunc {
 		}
 		tx.Commit()
 		fmt.Println(order, err)
-		return g.OK(context, order)
+		context.SetHeader("Content-Type", "application/json")
+		return context.Write(order)
 	})
 }
 

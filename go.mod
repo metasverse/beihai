@@ -3,6 +3,7 @@ module lihood
 go 1.18
 
 require (
+	github.com/bwmarrin/snowflake v0.3.0
 	github.com/eatmoreapple/regia v1.1.5
 	github.com/eatmoreapple/sqlbuilder v1.1.3
 	github.com/go-redis/redis/v9 v9.0.0-beta.2

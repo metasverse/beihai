@@ -4,7 +4,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"strconv"
+	"time"
+
 	"github.com/google/uuid"
+
 	"lihood/conf"
 	"lihood/g"
 	"lihood/internal/enum"
@@ -12,12 +17,10 @@ import (
 	"lihood/internal/repository"
 	"lihood/pkg/chain"
 	"lihood/pkg/pay"
-	"log"
-	"time"
 )
 
 type OrderService interface {
-	NewOrder(uid int64, pid int64, payType enum.PayType) (interface{}, error)
+	NewOrder(uid int64, pid int64, payType enum.PayType) ([]byte, error)
 	OrderCallback(orderID string) error
 	//QueryOrder
 }
@@ -109,7 +112,14 @@ func (o orderService) OrderCallback(orderID string) error {
 	return userRepo.Create(&item)
 }
 
-func (o orderService) NewOrder(uid int64, pid int64, payType enum.PayType) (interface{}, error) {
+func (o orderService) NewOrder(uid int64, pid int64, payType enum.PayType) ([]byte, error) {
+	user, err := repository.NewAccountRepository(o.session).GetByID(uid)
+	if err != nil {
+		return nil, err
+	}
+	if user.IDCardNum == "" {
+		return nil, g.Error("请先实名认证")
+	}
 	// 先判断当前的商品有没有存库
 	fmt.Println(uid, pid, payType)
 	userProRepo := repository.NewUserProductRepository(o.session)
@@ -135,7 +145,7 @@ func (o orderService) NewOrder(uid int64, pid int64, payType enum.PayType) (inte
 	}
 	// 创建订单
 	order := models.ProductOrder{
-		OID:        "32FY" + uuid.New().String()[:8],
+		OID:        uuid.New().String()[:8],
 		PayType:    payType,
 		PID:        pid,
 		UID:        uid,
@@ -144,10 +154,24 @@ func (o orderService) NewOrder(uid int64, pid int64, payType enum.PayType) (inte
 	if err := repository.NewProductOrderRepository(o.session).Create(&order); err != nil {
 		return nil, err
 	}
-	client := pay.PayerFactory(payType)
-	if client == nil {
-		return nil, g.Error("支付方式不存在")
+
+	cb := conf.Instance.Server.Domain + fmt.Sprintf("/api/v1/order/callback/%s", order.OID)
+
+	// 100 => 1.00
+	price := strconv.Itoa(int(product.Price * 100))
+	if len(price) <= 2 {
+		price = "0." + price
+	} else {
+		price = price[:len(price)-2] + "." + price[len(price)-2:]
 	}
-	cb := conf.Instance.Server.Domain + fmt.Sprintf("/api/v1/order/callback/%s", product.OrderNo)
-	return client.Pay(order.OID, product.Price, cb)
+	// 取前4位
+
+	desc := product.Name[:4]
+	fmt.Println(desc, user.IDCardNum, user.Name, price, cb, "2")
+	resp, err := pay.HfPay(desc, user.IDCardNum, user.Name, price, cb, "2")
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

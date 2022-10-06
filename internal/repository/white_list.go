@@ -21,7 +21,6 @@ type whiteListRepository struct {
 }
 
 func (w whiteListRepository) IsWhiteList(pid, uid int64) (bool, error) {
-	builder := sqlbuilder.NewSelect("?")
-	builder.From("tbl_product_white_list").Fields("1").Where("pid = ? AND uid = ?", pid, uid).Limit(1)
-	return sqlbuilder.BuilderScanner[bool](w.session, builder).One(context.Background())
+	query := "SELECT 1 FROM tbl_product_white_list WHERE pid = ? AND uid = ? LIMIT 1"
+	return sqlbuilder.NewQueryScanner[bool](w.session, query, pid, uid).One(context.Background())
 }
